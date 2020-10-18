@@ -8,14 +8,16 @@ from docx.oxml.ns import nsdecls
 from docx.shared import Inches
 from docx.shared import Pt
 
+from utils.utils_print import warningPrint
 
-def make_document(vtt_file_path, title):
+
+def make_document(vtt_file_path, title, sentence_count):
     document = Document()
 
     style_document_default_vtt(document, vtt_file_path, title)
 
     table = make_formatted_table(document)
-    vtt_lines = parse_vtt_file(vtt_file_path)
+    vtt_lines = parse_vtt_file(vtt_file_path, sentence_count)
 
     fill_table(table, vtt_lines)
     set_col_widths(table)
@@ -48,7 +50,7 @@ def fill_table(table, vtt_lines):
             count = count + 1
 
         if not timeReg.search(line):
-            new_row.cells[2].text = line
+            new_row.cells[2].text = line+'\n'
             count = count + 1
 
         if count >= 3:
@@ -95,23 +97,66 @@ def get_vtt_files(directory_name):
 
     return all_files
 
-def parse_vtt_file(vtt_file):
-    undesired_lines = [
-            'WEBVTT\n',
-            '\n'
-    ]
+
+# Removes unnecessary vtt stuff that shouldn't be in the output document
+# includes: WEBVTT tag, line numbers, any undesired_lines passed in
+def remove_unwanted_content(file_lines, undesired_lines):
+    undesired_lines = undesired_lines + ['WEBVTT\n'] + ['\n']
     desired_lines = []
-
-    with open(vtt_file, 'r') as f:
-        lines = f.readlines()
-
-    for line in lines:
+    num_reg = re.compile(r'^\d{1,4}\n')
+    for line in file_lines:
         if line in undesired_lines:
             continue
-
+        if num_reg.search(line):
+            continue
         desired_lines.append(line)
 
     return desired_lines
+
+
+def read_file_lines(vtt_file):
+    with open(vtt_file, 'r') as f:
+        lines = f.readlines()
+
+    return lines
+
+
+def parse_vtt_file(vtt_file, sentence_count):
+    count = 0
+    end_reg = re.compile(r'[a-z](\.|!|\?)')
+    full_line = ''
+    output_lines = []
+    time_recording = True
+    time_reg = re.compile(r'\d{1,2}:\d{1,2}:\d{1,2}')
+    lines = read_file_lines(vtt_file)
+    desired_lines = remove_unwanted_content(lines, [])
+
+    # combine sentences
+    for line in desired_lines:
+        if end_reg.search(line):
+            count = count + 1
+            if count >= sentence_count:
+                full_line += line
+                full_line = full_line.replace('\n', ' ')
+                output_lines.append(full_line)
+                full_line = ''
+                time_recording = True
+                count = 0
+                continue
+
+        if time_recording and time_reg.search(line):
+            time_recording = False 
+            output_lines.append(line)
+            continue
+
+        if not time_reg.search(line):
+            full_line += line
+
+    full_line = full_line.replace('\n', ' ')
+    output_lines.append(full_line)
+    print(output_lines)
+
+    return output_lines
 
 
 def set_col_widths(table):

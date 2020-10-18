@@ -15,7 +15,13 @@ def main():
         vtt_name = vtt_file[8:]
         warningPrint(f'Processing {vtt_name} . . .')
         title = click.prompt('Video Title', default='Unknown')
-        make_document(vtt_file, title)
+        warningPrint(
+                '''Leave this option as default (1) if there are multiple 
+                speakers in video'''
+        )
+        sentence_count = click.prompt(
+                'How many sentences to combine each row by?', default=1)
+        make_document(vtt_file, title, sentence_count)
         successPrint('Done.')
 
 if __name__ == '__main__':
